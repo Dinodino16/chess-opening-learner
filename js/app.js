@@ -418,11 +418,31 @@
   // Typing searches every variation for the chosen colour directly.
   const BACK_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
 
+  /** Small board after the first `plies` moves, facing the player, last move highlighted. */
+  function miniBoard(moves, plies) {
+    const g = new Chess();
+    let last = null;
+    for (let i = 0; i < plies; i++) last = g.move(moves[i]);
+    const pieces = g.pieces();
+    let html = '<span class="mini" aria-hidden="true">';
+    for (let cell = 0; cell < 64; cell++) {
+      const idx = side === 'w' ? cell : 63 - cell;
+      const sq = 'abcdefgh'[idx & 7] + (8 - (idx >> 3));
+      const shade = ((idx >> 3) + (idx & 7)) % 2 ? 'd' : 'l';
+      const hl = last && (sq === last.from || sq === last.to) ? ' hl' : '';
+      html += `<span class="mini-sq ${shade}${hl}">${pieces[sq] ? `<span class="piece ${pieces[sq]}"></span>` : ''}</span>`;
+    }
+    return html + '</span>';
+  }
+
   function variationButton(o, i, withFamily) {
     return `<li><button class="pick" type="button" data-v="${i}">
-      <span class="pick-name">${esc(withFamily ? o.title : o.name)}</span>
-      <span class="pick-meta">${esc(o.eco)} · ${esc(o.variation)}</span>
-      <span class="pick-line">${esc(preview(o.moves))}</span>
+      <span class="pick-text">
+        <span class="pick-name">${esc(withFamily ? o.title : o.name)}</span>
+        <span class="pick-meta">${esc(o.eco)} · ${esc(o.variation)}</span>
+        <span class="pick-line">${esc(preview(o.moves))}</span>
+      </span>
+      ${miniBoard(o.moves, o.show)}
     </button></li>`;
   }
 
@@ -446,9 +466,12 @@
       if (!terms.length) {
         shown = [];
         list.innerHTML = families.map((f, i) => `<li><button class="pick family" type="button" data-f="${i}">
-            <span class="pick-name">${esc(f.name)}</span>
-            <span class="pick-meta">${esc(f.eco)} · ${f.variations.length} variation${f.variations.length === 1 ? '' : 's'}</span>
-            <span class="pick-sum">${esc(f.summary)}</span>
+            <span class="pick-text">
+              <span class="pick-name">${esc(f.name)}</span>
+              <span class="pick-meta">${esc(f.eco)} · ${f.variations.length} variation${f.variations.length === 1 ? '' : 's'}</span>
+              <span class="pick-sum">${esc(f.summary)}</span>
+            </span>
+            ${miniBoard(f.variations[0].moves, f.show)}
           </button></li>`).join('');
         return;
       }

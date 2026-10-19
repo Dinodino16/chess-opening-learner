@@ -1,3 +1,5 @@
 # Untrimmed source copies of the sound effects; the game uses sounds/*.mp3.
 sounds/original/
 .DS_Store
+# Stray test screenshots
+/*.png

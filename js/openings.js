@@ -3,6 +3,9 @@
  * variation is one line in SAN from the start position. `side` is the colour the
  * player trains as; the trainer plays the other side.
  *
+ * `show` is how many moves the picker's thumbnail plays: up to the move that defines
+ * the opening or variation.
+ *
  * `ideas[i]` explains `moves[i]`. They are written for this trainer from general
  * opening principles, not quoted. `source` says what an external reference covers:
  *   kind 'line'    - the reference gives this move sequence
@@ -31,6 +34,7 @@
       name: 'Vienna',
       eco: 'C25–C29',
       side: 'w',
+      show: 3,   // 2.Nc3
       summary: 'White develops the queen\'s knight first so the f-pawn stays free.',
       variations: [
         {
@@ -38,6 +42,7 @@
           name: 'Vienna Gambit',
           variation: '3.f4 d5 4.fxe5 Nxe4 5.Nf3',
           eco: 'C29',
+          show: 5,   // 3.f4
           line: 'e4 e5 Nc3 Nf6 f4 d5 fxe5 Nxe4 Nf3 Be7 d4 O-O Bd3 f5 exf6 Bxf6 O-O',
           intro: 'The sharp option: White strikes at e5 with f4 straight away, aiming for open lines and quick development.',
           ideas: VIENNA_START.concat([
@@ -62,6 +67,7 @@
           name: '3.Bc4 Variation',
           variation: '3.Bc4 Nc6 4.d3 Bc5 5.f4',
           eco: 'C26',
+          show: 5,   // 3.Bc4
           line: 'e4 e5 Nc3 Nf6 Bc4 Nc6 d3 Bc5 f4 d6 Nf3',
           intro: 'The patient option: White develops the bishop and solidifies the centre first, then plays f4 once everything is ready.',
           ideas: VIENNA_START.concat([
@@ -80,6 +86,7 @@
           name: 'Mieses Variation',
           variation: '3.g3 d5 4.exd5 Nxd5 5.Bg2',
           eco: 'C26',
+          show: 5,   // 3.g3
           line: 'e4 e5 Nc3 Nf6 g3 d5 exd5 Nxd5 Bg2 Nxc3 bxc3 Bd6 Nf3 O-O O-O',
           intro: 'The positional option: White fianchettoes the king\'s bishop and plays for long-term pressure on the long diagonal.',
           ideas: VIENNA_START.concat([
@@ -104,6 +111,7 @@
       name: 'Caro-Kann',
       eco: 'B10–B19',
       side: 'b',
+      show: 2,   // 1...c6
       summary: 'A solid defence: ...c6 and ...d5 challenge e4 without locking in Black\'s light-squared bishop.',
       variations: [
         {
@@ -111,6 +119,7 @@
           name: 'Classical Variation',
           variation: '3.Nc3 dxe4 4.Nxe4 Bf5',
           eco: 'B18',
+          show: 8,   // 4...Bf5
           line: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5 Ng3 Bg6 h4 h6 Nf3 Nd7 h5 Bh7 Bd3 Bxd3 Qxd3 e6',
           intro: 'A solid defence: Black challenges e4 with ...d5 backed by ...c6, and gets the light-squared bishop out before closing the position with ...e6.',
           ideas: [

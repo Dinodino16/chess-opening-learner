@@ -17,7 +17,13 @@ for (const o of OPENINGS) {
   // Book SAN must match the engine's SAN exactly, or the trainer can't compare moves.
   assert.deepStrictEqual(g.history().map((s) => s.replace(/[+#]/g, '')), o.moves.map((s) => s.replace(/[+#]/g, '')), `${o.name}: SAN mismatch`);
 }
-for (const f of FAMILIES) assert(f.variations.length && f.variations.every((v) => v.side === f.side), `${f.name}: bad family`);
+for (const o of OPENINGS) assert(o.show >= 1 && o.show <= o.moves.length, `${o.name}: thumbnail move count out of range`);
+for (const f of FAMILIES) {
+  assert(f.variations.length && f.variations.every((v) => v.side === f.side), `${f.name}: bad family`);
+  // The family thumbnail plays the first variation's moves, so they must be shared by every variation.
+  const head = f.variations[0].moves.slice(0, f.show).join(' ');
+  assert(f.show >= 1 && f.variations.every((v) => v.moves.slice(0, f.show).join(' ') === head), `${f.name}: thumbnail moves not shared`);
+}
 
 // The 3.Bc4 idea text claims the final position is the King's Gambit Declined one. Prove it.
 const bc4 = new Chess();

@@ -1,6 +1,6 @@
 <title>Opening Trainer</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="css/pieces.css?v=202610192208">
+<link rel="stylesheet" href="css/pieces.css?v=202610192217">
 <style>
   /* Layout: one column the width of the board: captures above, board, captures below, then the move strip. */
   :root {
@@ -150,6 +150,7 @@
   /* Opening picker: search box over a short scrolling list. */
   .picker {
     position: absolute; inset: 0; z-index: 30;
+    container-type: size;
     display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 10px;
     padding: clamp(12px, 4%, 24px);
     background: rgba(20, 12, 6, 0.86);
@@ -172,14 +173,28 @@
   .picker-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
   .pick {
     width: 100%; text-align: left;
-    display: grid; gap: 3px;
-    padding: 10px 12px;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px;
+    padding: 7px 8px 7px 12px;
     background: var(--bar); color: var(--ink);
     border: 2px solid transparent; border-radius: 8px; cursor: pointer;
     font: inherit;
   }
   .pick:hover, .pick:focus-visible { border-color: var(--accent); outline: none; }
+  .pick-text { display: grid; gap: 3px; min-width: 0; }
   .pick-name { font-size: 16px; }
+
+  /* Thumbnail board on each opening card. */
+  .mini {
+    width: clamp(72px, 12.5vmin, 112px); aspect-ratio: 1;
+    width: clamp(60px, 20cqh, 112px); /* sized to the picker's height, so three cards always fit */
+    display: grid; grid-template: repeat(8, 1fr) / repeat(8, 1fr);
+    border-radius: 3px; overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  }
+  .mini-sq.l { background: var(--sq-light); }
+  .mini-sq.d { background: var(--sq-dark); }
+  .mini-sq.hl { box-shadow: inset 0 0 0 99px var(--hl-last); }
+  .mini .piece { position: static; display: block; width: 100%; height: 100%; will-change: auto; }
   .pick-meta { font-size: 12px; font-weight: 500; color: var(--ink-dim); }
   .pick-line { font: 500 12px/1.3 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; color: var(--accent); }
   .pick-sum { font-size: 12.5px; font-weight: 500; line-height: 1.35; color: var(--ink-dim); }
@@ -312,8 +327,8 @@
   </section>
 </main>
 
-<script src="js/chess.js?v=202610192208"></script>
-<script src="js/ai.js?v=202610192208"></script>
-<script src="js/board.js?v=202610192208"></script>
-<script src="js/openings.js?v=202610192208"></script>
-<script src="js/app.js?v=202610192208"></script>
+<script src="js/chess.js?v=202610192217"></script>
+<script src="js/ai.js?v=202610192217"></script>
+<script src="js/board.js?v=202610192217"></script>
+<script src="js/openings.js?v=202610192217"></script>
+<script src="js/app.js?v=202610192217"></script>
