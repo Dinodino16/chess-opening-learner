@@ -18,6 +18,11 @@ npx serve .
 ```
 
 
+## Releasing
+
+GitHub Pages lets browsers cache files for up to 10 minutes. Before committing a change, run
+`sh scripts/stamp-version.sh` so the page loads the new scripts instead of a stale mix.
+
 ## Tests
 
 ```
