@@ -8,29 +8,7 @@ Pick a colour, search for an opening, and play through it against an opponent th
 - **Hint** shows the piece to move, then an arrow to its square.
 - **Ideas** explains the idea behind each move, with the source where one exists.
 - **End game** (or mate/draw) gives a review of how you did in the opening.
-
-## Run it
-
-No build step. Open `index.html` in a browser, or serve the folder:
-
-```
-npx serve .
-```
-
-
-## Releasing
-
-GitHub Pages lets browsers cache files for up to 10 minutes. Before committing a change, run
-`sh scripts/stamp-version.sh` so the page loads the new scripts instead of a stale mix.
-
-## Tests
-
-```
-node test/engine.test.js     # move generation (perft), SAN, draws
-node test/openings.test.js   # every book line is legal and has an idea per move
-node test/ai.test.js         # opponent finds basic tactics, and fast enough
-```
-
+- 
 ## Layout
 
 | File | What it does |
