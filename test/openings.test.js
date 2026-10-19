@@ -32,4 +32,14 @@ const kgd = new Chess();
 'e4 e5 f4 Bc5 Nf3 d6 Nc3 Nf6 Bc4 Nc6 d3'.split(' ').forEach((s) => assert(kgd.move(s), s));
 assert.strictEqual(bc4.fen().split(' ').slice(0, 4).join(' '), kgd.fen().split(' ').slice(0, 4).join(' '), '3.Bc4 line is not the KGD position');
 
+// Claims made in idea texts, checked on the board.
+const after = (line) => { const g = new Chess(); line.split(' ').forEach((m) => assert(g.move(m), m)); return g; };
+const hits = (g, sq, by) => g._attacked(Chess.squareIndex(sq), by);
+const EX = 'e4 c6 d4 d5 exd5 cxd5 Bd3 Nc6 c3 Nf6 Bf4 Bg4';
+assert(hits(after('e4 c6 d4 d5 exd5 cxd5 Bd3'), 'f5', 'w'), 'Exchange: 4.Bd3 should cover f5');
+assert(hits(after('e4 c6 d4 d5 exd5 cxd5 Bd3 Nc6'), 'd4', 'b'), 'Exchange: 4...Nc6 should hit d4');
+assert(hits(after(EX), 'd1', 'b'), 'Exchange: 6...Bg4 should attack the queen');
+assert(hits(after(EX + ' Qb3'), 'b7', 'w') && hits(after(EX + ' Qb3'), 'd5', 'w'), 'Exchange: 7.Qb3 should hit b7 and d5');
+assert(hits(after(EX + ' Qb3 Qd7'), 'b7', 'b') && hits(after(EX + ' Qb3 Qd7'), 'g4', 'b'), 'Exchange: 7...Qd7 should guard b7 and g4');
+
 console.log(`openings: ${OPENINGS.length} lines in ${FAMILIES.length} families, all legal`);

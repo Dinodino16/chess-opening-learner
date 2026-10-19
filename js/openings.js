@@ -28,6 +28,14 @@
     'Black\'s most active reply: it develops and attacks e4, getting ready to hit back with ...d5.',
   ];
 
+  // 1.e4 c6 2.d4 d5: shared by every Caro-Kann variation here.
+  const CARO_START = [
+    'Claims the centre and opens lines for the queen and the light-squared bishop.',
+    'The Caro-Kann. ...c6 prepares ...d5, so if White ever takes on d5 Black recaptures with a pawn and keeps a foothold in the centre. Unlike the French (1...e6), it doesn\'t shut in the light-squared bishop.',
+    'White takes the full centre with two pawns.',
+    'The point of 1...c6: Black challenges e4 straight away.',
+  ];
+
   const FAMILIES = [
     {
       id: 'vienna',
@@ -122,11 +130,7 @@
           show: 8,   // 4...Bf5
           line: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5 Ng3 Bg6 h4 h6 Nf3 Nd7 h5 Bh7 Bd3 Bxd3 Qxd3 e6',
           intro: 'A solid defence: Black challenges e4 with ...d5 backed by ...c6, and gets the light-squared bishop out before closing the position with ...e6.',
-          ideas: [
-            'Claims the centre and opens lines for the queen and the light-squared bishop.',
-            'The Caro-Kann. ...c6 prepares ...d5, so if White ever takes on d5 Black recaptures with a pawn and keeps a foothold in the centre. Unlike the French (1...e6), it doesn\'t shut in the light-squared bishop.',
-            'White takes the full centre with two pawns.',
-            'The point of 1...c6: Black challenges e4 straight away.',
+          ideas: CARO_START.concat([
             'White defends e4 by developing a piece rather than pushing past it.',
             'Black releases the tension. With White\'s e-pawn gone, Black gets an easy, solid position with no weaknesses.',
             'The knight recaptures on a strong central square.',
@@ -143,8 +147,32 @@
             'Black takes rather than let the bishop be shut in on h7.',
             'The queen recaptures on a central square. From here White usually develops with Bf4 or Bd2 and castles queenside.',
             'With the bishop already outside the pawn chain, ...e6 costs nothing: it frees the f8 bishop and builds a solid centre.',
-          ],
+          ]),
           source: { kind: 'line', label: 'Wikipedia: Caro–Kann Defence', url: WIKI_CARO },
+        },
+        {
+          id: 'caro-kann-exchange',
+          name: 'Exchange Variation',
+          variation: '3.exd5 cxd5 4.Bd3 Nc6 5.c3',
+          eco: 'B13',
+          show: 5,   // 3.exd5
+          line: 'e4 c6 d4 d5 exd5 cxd5 Bd3 Nc6 c3 Nf6 Bf4 Bg4 Qb3 Qd7 Nd2 e6',
+          intro: 'White exchanges on d5 straight away for a quiet, symmetrical structure. Black\'s job is to get the light-squared bishop out actively before playing ...e6.',
+          ideas: CARO_START.concat([
+            'The Exchange Variation. White releases the central tension at once, going for a calm position where piece activity matters more than memorised theory.',
+            'Black recaptures with the c-pawn, which is exactly what ...c6 prepared: a pawn stays on d5 in the centre.',
+            'Develops while stopping ...Bf5, so Black\'s light-squared bishop can\'t take its best diagonal.',
+            'Develops and adds pressure on d4.',
+            'Supports d4 with a pawn. The c3–d4 chain is a solid base, the same structure as the Queen\'s Gambit Declined Exchange with colours reversed.',
+            'Develops, guards d5 and covers the kingside.',
+            'The bishop comes out before e3 can lock it in, and controls e5 and b8.',
+            'Black still gets the bishop outside the pawn chain, and it attacks the queen on d1 to gain time.',
+            'The queen steps away with a threat: it attacks b7 and adds pressure on d5.',
+            'Protects b7 along the seventh rank and keeps the bishop on g4 defended. The older 7...Na5 fell out of favour after Fischer beat Petrosian with this line in 1970.',
+            'Develops the knight to d2, where it keeps the queen\'s support and leaves f3 for the other knight.',
+            'Black completes a solid setup: ...e6 supports d5 and frees the f8 bishop. The light-squared bishop is already outside the pawn chain, which is the whole point of the Caro-Kann.',
+          ]),
+          source: { kind: 'reading', label: 'Wikibooks: Caro-Kann Exchange Variation', url: 'https://en.wikibooks.org/wiki/Chess_Opening_Theory/1._e4/1...c6/2._d4/2...d5/3._exd5/3...cxd5' },
         },
       ],
     },
