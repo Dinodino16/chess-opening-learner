@@ -1,6 +1,6 @@
 <title>Opening Trainer</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="css/pieces.css?v=202610192228">
+<link rel="stylesheet" href="css/pieces.css?v=202610192240">
 <style>
   /* Layout: one column the width of the board: captures above, board, captures below, then the move strip. */
   :root {
@@ -288,12 +288,87 @@
   .cb-sq.premove::after { background: rgba(40, 90, 200, 0.45); }
   .cb-sq.hint::after { box-shadow: inset 0 0 0 4px rgba(70, 160, 90, 0.95); }
 
+  /* Openings library: button pinned top-right, panel slides in from the right. */
+  [hidden] { display: none !important; }
+  .lib-btn {
+    position: fixed; z-index: 40;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 14px;
+    background: var(--bar); color: var(--ink);
+    border: 1px solid #5a3a28; border-radius: 8px;
+    font: 600 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer;
+  }
+  .lib-btn:hover, .lib-btn[aria-expanded="true"] { border-color: var(--accent); }
+  .lib-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .lib-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(10, 6, 3, 0.5); }
+  .library {
+    position: fixed; z-index: 60; top: 0; right: 0; bottom: 0;
+    width: min(400px, 100%);
+    display: grid; grid-template-rows: auto minmax(0, 1fr);
+    background: #24160e; color: var(--ink);
+    box-shadow: -12px 0 32px rgba(0, 0, 0, 0.45);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    animation: lib-in 180ms ease-out;
+  }
+  @keyframes lib-in { from { transform: translateX(24px); opacity: 0; } }
+  .lib-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 20px; border-bottom: 1px solid #3d2618; }
+  .lib-head h2 { margin: 0; font-size: 20px; }
+  .lib-head p { margin: 2px 0 0; font-size: 13px; font-weight: 500; color: var(--ink-dim); }
+  .lib-close { width: 38px; height: 38px; display: grid; place-items: center; background: var(--bar); color: var(--ink); border: 0; border-radius: 8px; cursor: pointer; }
+  .lib-close:hover { background: #3d2618; }
+  .lib-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .lib-body { overflow-y: auto; padding: 8px 16px 24px 20px; }
+  .lib-sec h3 { margin: 16px 0 8px; font-size: 12px; font-weight: 700; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+  .lib-fam { background: var(--bar); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+  .lib-fam-btn {
+    width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px;
+    padding: 10px 12px; background: none; color: var(--ink); border: 0; cursor: pointer; text-align: left; font: inherit;
+  }
+  .lib-fam-btn:hover { background: #3d2618; }
+  .lib-fam-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .lib-fam-btn .mini { width: 64px; }
+  .lib-fam-text { display: grid; gap: 3px; min-width: 0; }
+  .lib-fam-name { font-size: 17px; }
+  .lib-fam-meta { font-size: 12.5px; font-weight: 500; color: var(--ink-dim); }
+  .lib-chev { color: var(--ink-dim); transition: transform 150ms; }
+  .lib-fam-btn[aria-expanded="true"] .lib-chev { transform: rotate(180deg); }
+  .lib-vars { list-style: none; margin: 0; padding: 0 8px 8px; display: grid; gap: 4px; }
+  .lib-var {
+    width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name play" "line play"; gap: 2px 10px; align-items: center;
+    padding: 9px 12px; background: #24160e; color: var(--ink); border: 1px solid transparent; border-radius: 8px; cursor: pointer; text-align: left; font: inherit;
+  }
+  .lib-var:hover, .lib-var:focus-visible { border-color: var(--accent); outline: none; }
+  .lib-var-name { grid-area: name; font-size: 15px; }
+  .lib-var-line { grid-area: line; font: 500 12px/1.3 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lib-play { grid-area: play; font-size: 12px; font-weight: 700; color: var(--ink-dim); }
+  .lib-var:hover .lib-play { color: var(--accent); }
+
   @media (prefers-reduced-motion: reduce) {
     .piece.anim, .piece.captured { transition: none; }
     .piece.appear { animation: none; }
     .toast { transition: none; }
+    .library { animation: none; }
+    .lib-chev { transition: none; }
   }
 </style>
+
+<button class="lib-btn" id="lib-btn" type="button" aria-expanded="false" aria-controls="library">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg>
+  Openings
+</button>
+<div class="lib-backdrop" id="lib-backdrop" hidden></div>
+<aside class="library" id="library" aria-label="Openings in the app" hidden>
+  <div class="lib-head">
+    <div><h2>Openings</h2><p id="lib-count"></p></div>
+    <button class="lib-close" id="lib-close" type="button" aria-label="Close openings list">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="lib-body" id="lib-body"></div>
+</aside>
 
 <main class="game">
   <div class="strip" id="strip-top" aria-label="Pieces captured by Black"></div>
@@ -327,8 +402,8 @@
   </section>
 </main>
 
-<script src="js/chess.js?v=202610192228"></script>
-<script src="js/ai.js?v=202610192228"></script>
-<script src="js/board.js?v=202610192228"></script>
-<script src="js/openings.js?v=202610192228"></script>
-<script src="js/app.js?v=202610192228"></script>
+<script src="js/chess.js?v=202610192240"></script>
+<script src="js/ai.js?v=202610192240"></script>
+<script src="js/board.js?v=202610192240"></script>
+<script src="js/openings.js?v=202610192240"></script>
+<script src="js/app.js?v=202610192240"></script>

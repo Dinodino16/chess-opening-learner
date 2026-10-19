@@ -418,15 +418,15 @@
   // Typing searches every variation for the chosen colour directly.
   const BACK_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
 
-  /** Small board after the first `plies` moves, facing the player, last move highlighted. */
-  function miniBoard(moves, plies) {
+  /** Small board after the first `plies` moves, facing `orient`, last move highlighted. */
+  function miniBoard(moves, plies, orient = side) {
     const g = new Chess();
     let last = null;
     for (let i = 0; i < plies; i++) last = g.move(moves[i]);
     const pieces = g.pieces();
     let html = '<span class="mini" aria-hidden="true">';
     for (let cell = 0; cell < 64; cell++) {
-      const idx = side === 'w' ? cell : 63 - cell;
+      const idx = orient === 'w' ? cell : 63 - cell;
       const sq = 'abcdefgh'[idx & 7] + (8 - (idx >> 3));
       const shade = ((idx >> 3) + (idx & 7)) % 2 ? 'd' : 'l';
       const hl = last && (sq === last.from || sq === last.to) ? ' hl' : '';
@@ -614,6 +614,76 @@
     el.querySelector('.choice').focus();
   }
 
+  // ---------------------------------------------------------------- openings library
+
+  // Every opening in the app, grouped by colour; open one to see its variations,
+  // pick a variation to start practising it.
+  const library = $('#library');
+  const libBtn = $('#lib-btn');
+
+  function renderLibrary() {
+    const chevron = '<svg class="lib-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+    $('#lib-count').textContent = `${FAMILIES.length} openings · ${OPENINGS.length} lines`;
+    $('#lib-body').innerHTML = [['w', 'For White'], ['b', 'For Black']].map(([color, label]) => {
+      const fams = FAMILIES.filter((f) => f.side === color);
+      if (!fams.length) return '';
+      return `<section class="lib-sec"><h3>${label}</h3>${fams.map((f) => `
+        <div class="lib-fam">
+          <button class="lib-fam-btn" type="button" aria-expanded="false" data-fam="${f.id}">
+            ${miniBoard(f.variations[0].moves, f.show, color)}
+            <span class="lib-fam-text">
+              <span class="lib-fam-name">${esc(f.name)}</span>
+              <span class="lib-fam-meta">${esc(f.eco)} · ${f.variations.length} variation${f.variations.length === 1 ? '' : 's'}</span>
+            </span>
+            ${chevron}
+          </button>
+          <ul class="lib-vars" hidden>${f.variations.map((v) => `
+            <li><button class="lib-var" type="button" data-v="${v.id}">
+              <span class="lib-var-name">${esc(v.name)}</span>
+              <span class="lib-var-line">${esc(preview(v.moves))}</span>
+              <span class="lib-play">Practise</span>
+            </button></li>`).join('')}
+          </ul>
+        </div>`).join('')}</section>`;
+    }).join('');
+  }
+
+  function openLibrary() {
+    library.hidden = false;
+    $('#lib-backdrop').hidden = false;
+    libBtn.setAttribute('aria-expanded', 'true');
+    $('#lib-close').focus();
+  }
+
+  function closeLibrary() {
+    if (library.hidden) return;
+    library.hidden = true;
+    $('#lib-backdrop').hidden = true;
+    libBtn.setAttribute('aria-expanded', 'false');
+    libBtn.focus();
+  }
+
+  libBtn.addEventListener('click', () => (library.hidden ? openLibrary() : closeLibrary()));
+  $('#lib-close').addEventListener('click', closeLibrary);
+  $('#lib-backdrop').addEventListener('click', closeLibrary);
+  $('#lib-body').addEventListener('click', (e) => {
+    const fam = e.target.closest('.lib-fam-btn');
+    if (fam) {
+      const open = fam.getAttribute('aria-expanded') !== 'true';
+      fam.setAttribute('aria-expanded', String(open));
+      fam.nextElementSibling.hidden = !open;
+      return;
+    }
+    const v = e.target.closest('.lib-var');
+    if (!v) return;
+    const o = OPENINGS.find((x) => x.id === v.dataset.v);
+    closeLibrary();
+    side = o.side;
+    if (view.orientation !== side) view.flip();
+    startOpening(o);
+  });
+  renderLibrary();
+
   // ---------------------------------------------------------------- input
 
   $('#undo').addEventListener('click', takeBack);
@@ -624,6 +694,7 @@
 
   // ← take back, → replay, H hint, I ideas (not while typing in the search box).
   document.addEventListener('keydown', (e) => {
+    if (!library.hidden) { if (e.key === 'Escape') closeLibrary(); return; }
     if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest('input')) return;
     if (e.key === 'ArrowLeft') { e.preventDefault(); takeBack(); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); replay(); }
