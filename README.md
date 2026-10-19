@@ -8,7 +8,7 @@ Pick a colour, search for an opening, and play through it against an opponent th
 - **Hint** shows the piece to move, then an arrow to its square.
 - **Ideas** explains the idea behind each move, with the source where one exists.
 - **End game** (or mate/draw) gives a review of how you did in the opening.
-- 
+  
 ## Layout
 
 | File | What it does |
