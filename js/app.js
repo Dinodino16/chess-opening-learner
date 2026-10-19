@@ -11,7 +11,7 @@
   const game = new Chess();
   let redo = []; // moves taken back, replayable with → until a new move is made
 
-  const view = new BoardView(boardEl, { onMove: playFromBoard });
+  const view = new BoardView(boardEl, { onMove: playFromBoard, onPremove: setPremove });
 
   // ---------------------------------------------------------------- sound
 
@@ -82,6 +82,7 @@
   let hintLevel = 0;    // hint presses on the current move: 1 = piece, 2 = piece + arrow
   let hintsUsed = {};   // ply index -> highest hint level used on that move (for the review)
   let ended = false;    // game finished (End game, mate or draw); the review is showing
+  let premove = null;   // { from, to } queued while the opponent thinks
   let opponentTimer = 0;
   let reviewTimer = 0;
 
@@ -104,6 +105,22 @@
   };
 
   const canPlay = () => !!opening && !ended && !game.isGameOver() && game.turn() === side;
+  const canPremove = () => !!opening && !ended && !game.isGameOver() && game.turn() !== side;
+
+  function setPremove(pm) {
+    premove = pm && canPremove() ? pm : null;
+    view.set({ premove });
+  }
+
+  /** Play the queued premove now that it's the player's turn. Returns whether it was legal. */
+  function runPremove() {
+    const pm = premove;
+    premove = null;
+    if (!pm || !canPlay()) { view.set({ premove: null }); return false; }
+    if (playFromBoard(pm.from, pm.to, 'Q', { animate: true })) return true;
+    view.set({ premove: null });
+    return false;
+  }
 
   /** What the board should show for hints right now: { hint: square, arrow: { from, to } }. */
   function hintState() {
@@ -145,9 +162,9 @@
     render(animate);
 
     if (want && !sameSan(m.san, want)) {
-      toast(`Out of book: the ${opening.name} plays ${moveLabel(ply, want)}. Playing on.`);
+      toast(`Out of book. The line continues ${moveLabel(ply, want)}.`);
     } else if (want && ply + 1 === opening.moves.length) {
-      toast(`${opening.name} complete. Play on, or end the game for your review.`);
+      toast('Line complete. Play on, or end the game for a review.');
     }
     afterMove();
     return true;
@@ -173,7 +190,7 @@
       const m = want ? game.move(want) : game.move(game.bestMove({ depth: 3 }).san);
       Sound.forMove(m);
       render(true);
-      afterMove();
+      if (!runPremove()) afterMove();
     }, opponentDelay());
   }
 
@@ -184,6 +201,7 @@
     clearTimeout(reviewTimer);
     clearOverlays();
     ended = false;
+    premove = null;
     do {
       redo.push(game.undo().san);
     } while (game.turn() !== side);
@@ -196,6 +214,7 @@
   /** Forward: replay the player's move and the reply that followed it. */
   function replay() {
     if (!redo.length || ended) return;
+    premove = null;
     let m;
     do {
       m = game.move(redo.pop());
@@ -210,6 +229,7 @@
     if (!opening || ended) return;
     clearTimeout(opponentTimer);
     ended = true;
+    premove = null;
     render(false);
     showReview();
   }
@@ -224,6 +244,9 @@
       movable: side || 'none',
       lastMove: game.lastMove(),
       check: game.checkSquare(),
+      premovable: canPremove(),
+      premoveDests: canPremove() ? game.premoveDests(side) : {},
+      premove,
       animate,
     }, hintState()));
     renderCaptures();
@@ -313,14 +336,14 @@
     const n = game.history().length;
     const book = bookLength();
     if (n === 0) {
-      head.innerHTML = `${esc(opening.name)}<span>${esc(opening.variation)}</span>`;
+      head.innerHTML = `${esc(opening.title)}<span>${esc(opening.variation)}</span>`;
       text.textContent = opening.intro;
     } else {
       const i = n - 1;
       const mine = (i % 2 ? 'b' : 'w') === side;
       head.innerHTML = `${esc(moveLabel(i, game.history()[i]))}<span>${mine ? 'your move' : 'opponent'}${i >= book ? ' · out of book' : ''}</span>`;
       if (i < book) text.textContent = opening.ideas[i] || '';
-      else if (book >= opening.moves.length) text.textContent = `The ${opening.name} line is finished. From here you're playing on your own.`;
+      else if (book >= opening.moves.length) text.textContent = 'That was the last book move. From here you\'re playing on your own.';
       else if (i === book) text.textContent = `The book move was ${moveLabel(i, opening.moves[i])}. ${opening.ideas[i]}`;
       else text.textContent = `The game left the book at ${moveLabel(book, game.history()[book])}. The opponent is now choosing its own moves.`;
     }
@@ -372,6 +395,8 @@
     clearTimeout(reviewTimer);
     opening = null;
     ended = false;
+    premove = null;
+    view.clearAnnotations();
     const el = overlay('chooser', '<p>Play as</p><div class="choices">'
       + '<button class="choice" type="button" data-color="w"><span class="piece wK"></span>White</button>'
       + '<button class="choice" type="button" data-color="b"><span class="piece bK"></span>Black</button>'
@@ -389,13 +414,22 @@
     el.querySelector('.choice').focus();
   }
 
-  // Step 2: opening, searchable. Only lines for the chosen colour are offered.
-  function showPicker() {
+  // Step 2: opening. Families first (Vienna, Caro-Kann); tap one for its variations.
+  // Typing searches every variation for the chosen colour directly.
+  const BACK_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+
+  function variationButton(o, i, withFamily) {
+    return `<li><button class="pick" type="button" data-v="${i}">
+      <span class="pick-name">${esc(withFamily ? o.title : o.name)}</span>
+      <span class="pick-meta">${esc(o.eco)} · ${esc(o.variation)}</span>
+      <span class="pick-line">${esc(preview(o.moves))}</span>
+    </button></li>`;
+  }
+
+  function showPicker(query = '') {
     const el = overlay('picker', `
       <div class="picker-head">
-        <button class="picker-back" type="button" aria-label="Change colour">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
-        </button>
+        <button class="picker-back" type="button" aria-label="Change colour">${BACK_ICON}</button>
         <span>Openings for ${side === 'w' ? 'White' : 'Black'}</span>
       </div>
       <input class="picker-search" id="opening-search" type="search" placeholder="Search openings" autocomplete="off" spellcheck="false" aria-label="Search openings">
@@ -404,36 +438,64 @@
     const input = el.querySelector('input');
     const list = el.querySelector('ul');
     const norm = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
-    let matches = [];
+    const families = FAMILIES.filter((f) => f.side === side);
+    let shown = [];   // variations currently listed (search mode)
 
     const paint = () => {
       const terms = norm(input.value).split(' ').filter(Boolean);
-      matches = OPENINGS.filter((o) => o.side === side)
-        .filter((o) => {
-          const hay = norm(`${o.name} ${o.variation} ${o.eco} ${o.line}`);
-          return terms.every((t) => hay.includes(t));
-        });
-      list.innerHTML = matches.length
-        ? matches.map((o, i) => `<li><button class="pick" type="button" data-i="${i}">
-            <span class="pick-name">${esc(o.name)}</span>
-            <span class="pick-meta">${esc(o.eco)} · ${esc(o.variation)}</span>
-            <span class="pick-line">${esc(preview(o.moves))}</span>
-          </button></li>`).join('')
+      if (!terms.length) {
+        shown = [];
+        list.innerHTML = families.map((f, i) => `<li><button class="pick family" type="button" data-f="${i}">
+            <span class="pick-name">${esc(f.name)}</span>
+            <span class="pick-meta">${esc(f.eco)} · ${f.variations.length} variation${f.variations.length === 1 ? '' : 's'}</span>
+            <span class="pick-sum">${esc(f.summary)}</span>
+          </button></li>`).join('');
+        return;
+      }
+      shown = OPENINGS.filter((o) => o.side === side).filter((o) => {
+        const hay = norm(`${o.familyName} ${o.name} ${o.variation} ${o.eco} ${o.line}`);
+        return terms.every((t) => hay.includes(t));
+      });
+      list.innerHTML = shown.length
+        ? shown.map((o, i) => variationButton(o, i, true)).join('')
         : `<li class="picker-empty">No openings match “${esc(input.value.trim())}”</li>`;
     };
 
     input.addEventListener('input', paint);
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && matches.length) startOpening(matches[0]);
+      if (e.key === 'Enter') {
+        if (shown.length) startOpening(shown[0]);
+        else if (!input.value.trim() && families.length) showFamily(families[0], '');
+      }
       if (e.key === 'Escape') showChooser();
     });
     list.addEventListener('click', (e) => {
       const b = e.target.closest('.pick');
-      if (b) startOpening(matches[Number(b.dataset.i)]);
+      if (!b) return;
+      if (b.dataset.f !== undefined) showFamily(families[Number(b.dataset.f)], input.value);
+      else startOpening(shown[Number(b.dataset.v)]);
     });
     el.querySelector('.picker-back').addEventListener('click', showChooser);
+    input.value = query;
     paint();
     input.focus({ preventScroll: true });
+  }
+
+  function showFamily(f, query) {
+    const el = overlay('picker', `
+      <div class="picker-head">
+        <button class="picker-back" type="button" aria-label="All openings">${BACK_ICON}</button>
+        <span>${esc(f.name)}</span>
+      </div>
+      <p class="picker-sum">${esc(f.summary)}</p>
+      <ul class="picker-list">${f.variations.map((o, i) => variationButton(o, i, false)).join('')}</ul>`, `${f.name} variations`);
+    el.querySelector('.picker-back').addEventListener('click', () => showPicker(query));
+    el.querySelector('ul').addEventListener('click', (e) => {
+      const b = e.target.closest('.pick');
+      if (b) startOpening(f.variations[Number(b.dataset.v)]);
+    });
+    el.addEventListener('keydown', (e) => { if (e.key === 'Escape') showPicker(query); });
+    el.querySelector('.pick').focus();
   }
 
   function preview(moves) {
@@ -451,8 +513,10 @@
     hintLevel = 0;
     hintsUsed = {};
     ended = false;
+    premove = null;
+    view.clearAnnotations();
     render(false);
-    toast(o.name);
+    toast(o.title);
     afterMove();
   }
 
@@ -477,7 +541,7 @@
     let verdict, detail;
     if (left) {
       verdict = `Left the book on move ${Math.floor(left.i / 2) + 1}`;
-      detail = `You played ${moveLabel(left.i, left.played)}. The ${opening.name} continues ${moveLabel(left.i, left.book)}.`;
+      detail = `You played ${moveLabel(left.i, left.played)}. ${opening.title} continues ${moveLabel(left.i, left.book)}.`;
     } else if (book >= line.length) {
       verdict = hinted ? 'Opening complete' : 'Perfect opening';
       detail = hinted
@@ -510,7 +574,7 @@
     const el = overlay('review', `
       <p class="rv-result">${esc(gameResultText())}</p>
       <div class="rv-score"><b>${r.clean}<span>/${r.total}</span></b><div><p class="rv-verdict">${esc(r.verdict)}</p><p class="rv-detail">${esc(r.detail)}</p></div></div>
-      <p class="rv-title">${esc(opening.name)} · your moves</p>
+      <p class="rv-title">${esc(opening.title)} · your moves</p>
       <ol class="rv-list">${rowHtml || '<li class="rv-empty">You didn\'t play any moves in the opening.</li>'}</ol>
       <div class="rv-actions">
         ${game.isGameOver() ? '' : '<button class="choice" type="button" data-act="back">Back to game</button>'}

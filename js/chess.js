@@ -179,6 +179,39 @@
       return out;
     }
 
+    /**
+     * Squares each of `color`'s pieces could reach on an otherwise empty board, as
+     * from-square -> [to-squares]. Used for premoves: the position will change before
+     * the move is played, so this is deliberately loose; legality is checked when it plays.
+     */
+    premoveDests(color) {
+      const b = this._board, out = {};
+      for (let from = 0; from < 64; from++) {
+        const p = b[from];
+        if (!p || p[0] !== color) continue;
+        const r = from >> 3, c = from & 7, type = p[1];
+        const to = new Set();
+        const add = (rr, cc) => { const s = at(rr, cc); if (s >= 0 && !(b[s] && b[s][0] === color)) to.add(s); };
+        if (type === 'P') {
+          const dir = color === 'w' ? -1 : 1;
+          add(r + dir, c - 1); add(r + dir, c); add(r + dir, c + 1);
+          if (r === (color === 'w' ? 6 : 1)) add(r + 2 * dir, c);
+        } else if (type === 'N' || type === 'K') {
+          for (const [dr, dc] of type === 'N' ? KNIGHT : KING) add(r + dr, c + dc);
+          const home = color === 'w' ? 60 : 4;
+          if (type === 'K' && from === home) {
+            if (this._castling[color === 'w' ? 'K' : 'k']) add(r, c + 2);
+            if (this._castling[color === 'w' ? 'Q' : 'q']) add(r, c - 2);
+          }
+        } else {
+          const dirs = type === 'R' ? ORTHO : type === 'B' ? DIAG : ORTHO.concat(DIAG);
+          for (const [dr, dc] of dirs) for (let k = 1; k < 8; k++) add(r + dr * k, c + dc * k);
+        }
+        if (to.size) out[sqName(from)] = [...to].map(sqName);
+      }
+      return out;
+    }
+
     // ---------------------------------------------------------------- moving
 
     /**

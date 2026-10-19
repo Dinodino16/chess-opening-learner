@@ -48,4 +48,11 @@ r.undo();
 assert(!r.isThreefold());
 assert.strictEqual(new Chess().move('e5'), null);
 
+// Premove squares: empty-board geometry (blockers may move first), never onto your own pieces.
+const pm = new Chess().premoveDests('w');
+assert.deepStrictEqual(pm.e2.sort(), ['d3', 'e3', 'e4', 'f3']);
+assert.deepStrictEqual(pm.g1.sort(), ['f3', 'h3']);
+assert.deepStrictEqual(pm.a1.sort(), ['a3', 'a4', 'a5', 'a6', 'a7', 'a8']);
+assert(new Chess('4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1').premoveDests('w').e1.includes('g1'), 'castling premove');
+
 console.log('engine: all tests passed');

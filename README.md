@@ -1,5 +1,7 @@
 # Chess Opening Learner
 
+**▶ Play it here: https://dinodino16.github.io/chess-opening-learner/**
+
 Pick a colour, search for an opening, and play through it against an opponent that answers from the book.
 
 - Play any legal move. Leaving the book is allowed: the opponent switches to a small built-in engine.

@@ -2,8 +2,10 @@
  * Interactive board view. Knows nothing about chess rules: the owner tells it
  * where pieces are and which moves are allowed, and it reports moves back.
  *
- *   const view = new BoardView(el, { onMove: (from, to, promotion) => bool });
- *   view.set({ pieces, dests, turn, movable, lastMove, check });
+ *   const view = new BoardView(el, { onMove: (from, to, promotion) => bool, onPremove: (move | null) => {} });
+ *   view.set({ pieces, dests, turn, movable, lastMove, check, premovable, premoveDests, premove });
+ *
+ * Right-click a square to mark it; right-drag to draw an arrow; left-click clears both.
  */
 (function (root) {
   'use strict';
@@ -20,12 +22,17 @@
     constructor(el, opts = {}) {
       this.el = el;
       this.onMove = opts.onMove || (() => true);
+      this.onPremove = opts.onPremove || (() => {});
       this.orientation = opts.orientation || 'w';
-      this.state = { pieces: {}, dests: {}, turn: 'w', movable: 'w', lastMove: null, check: null, hint: null, arrow: null };
+      this.state = { pieces: {}, dests: {}, turn: 'w', movable: 'w', lastMove: null, check: null, hint: null, arrow: null,
+        premovable: false, premoveDests: {}, premove: null };
       this.selected = null;
       this.drag = null;
       this.pieceEls = new Map(); // square name -> element
       this.promo = null;
+      this.marks = new Set();   // squares marked red with right-click
+      this.arrows = new Set();  // 'e2-e4' arrows drawn with right-drag
+      this.annot = null;        // right-button press in progress: { from, to }
 
       el.classList.add('cb');
       el.innerHTML = '<div class="cb-squares"></div><div class="cb-pieces"></div>'
@@ -58,13 +65,11 @@
       this._paintHighlights();
     }
 
-    /** Briefly mark a square red, e.g. where a rejected move was dropped. */
-    flash(square) {
-      const el = this._sqEl(square);
-      el.classList.remove('wrong');
-      void el.offsetWidth; // restart the animation if it is already running
-      el.classList.add('wrong');
-      el.addEventListener('animationend', () => el.classList.remove('wrong'), { once: true });
+    clearAnnotations() {
+      if (!this.marks.size && !this.arrows.size) return;
+      this.marks.clear();
+      this.arrows.clear();
+      this._paintHighlights();
     }
 
     flip() {
@@ -116,36 +121,49 @@
     }
 
     _paintHighlights() {
-      const { lastMove, check, hint } = this.state;
-      for (const s of this.squareEls) s.classList.remove('last', 'selected', 'dest', 'capture', 'check', 'hover', 'hint');
+      const { lastMove, check, hint, premove } = this.state;
+      for (const s of this.squareEls) s.classList.remove('last', 'selected', 'dest', 'capture', 'check', 'hover', 'hint', 'premove', 'marked');
       if (lastMove) {
         this._sqEl(lastMove.from).classList.add('last');
         this._sqEl(lastMove.to).classList.add('last');
       }
       if (check) this._sqEl(check).classList.add('check');
       if (hint) this._sqEl(hint).classList.add('hint');
-      this._paintArrow();
+      if (premove) {
+        this._sqEl(premove.from).classList.add('premove');
+        this._sqEl(premove.to).classList.add('premove');
+      }
+      for (const sq of this.marks) this._sqEl(sq).classList.add('marked');
+      this._paintArrows();
       if (this.selected) {
         this._sqEl(this.selected).classList.add('selected');
-        for (const to of this.state.dests[this.selected] || []) {
+        for (const to of this._destsOf(this.selected)) {
           this._sqEl(to).classList.add(this.state.pieces[to] ? 'capture' : 'dest');
         }
       }
     }
 
+    /** Hint arrow (state.arrow), the player's own arrows, and one being drawn. */
+    _paintArrows() {
+      let svg = '';
+      for (const key of this.arrows) svg += this._arrowSvg(...key.split('-'), 'user');
+      const a = this.annot;
+      if (a && a.to !== a.from) svg += this._arrowSvg(a.from, a.to, 'user drawing');
+      if (this.state.arrow) svg += this._arrowSvg(this.state.arrow.from, this.state.arrow.to, 'hint');
+      this.arrowsEl.innerHTML = svg;
+    }
+
     /**
-     * Draw state.arrow ({ from, to }) in board units: one square = 1. Knight moves
-     * get an L (long leg first) so it is obvious which way the knight jumps.
+     * One arrow in board units (one square = 1). Knight moves get an L (long leg
+     * first) so it is obvious which way the knight jumps.
      */
-    _paintArrow() {
-      const a = this.state.arrow;
-      if (!a) { this.arrowsEl.innerHTML = ''; return; }
+    _arrowSvg(from, to, cls) {
       const centre = (name) => {
         const cell = this._cell(name);
         return [(cell & 7) + 0.5, (cell >> 3) + 0.5];
       };
-      const [x1, y1] = centre(a.from);
-      const [x2, y2] = centre(a.to);
+      const [x1, y1] = centre(from);
+      const [x2, y2] = centre(to);
       const dx = x2 - x1, dy = y2 - y1;
       const pts = [[x1, y1]];
       const isKnight = (Math.abs(dx) === 1 && Math.abs(dy) === 2) || (Math.abs(dx) === 2 && Math.abs(dy) === 1);
@@ -162,7 +180,7 @@
       const shaft = pts.slice(0, -1).concat([[baseX + ux * 0.02, baseY + uy * 0.02]]);
       const head = [[tipX, tipY], [baseX - uy * HALF, baseY + ux * HALF], [baseX + uy * HALF, baseY - ux * HALF]];
       const fmt = (p) => p.map((v) => v.toFixed(3)).join(',');
-      this.arrowsEl.innerHTML = `<g class="cb-arrow"><polyline points="${shaft.map(fmt).join(' ')}"/>`
+      return `<g class="cb-arrow ${cls}"><polyline points="${shaft.map(fmt).join(' ')}"/>`
         + `<polygon points="${head.map(fmt).join(' ')}"/></g>`;
     }
 
@@ -223,23 +241,32 @@
 
     // ---------------------------------------------------------------- input
 
+    /** On your turn a piece uses real legal moves; on the opponent's turn, premove squares. */
+    _destsOf(from) {
+      const p = this.state.pieces[from];
+      if (!p) return [];
+      if (p[0] === this.state.turn) return this.state.dests[from] || [];
+      return this.state.premovable ? this.state.premoveDests[from] || [] : [];
+    }
+
     _canMoveFrom(sq) {
       const p = this.state.pieces[sq];
-      const { movable, turn } = this.state;
-      if (!p || p[0] !== turn) return false;
-      if (movable !== 'both' && movable !== turn) return false;
-      return (this.state.dests[sq] || []).length > 0;
+      const { movable } = this.state;
+      if (!p || (movable !== 'both' && p[0] !== movable)) return false;
+      return this._destsOf(sq).length > 0;
     }
 
     _isDest(from, to) {
-      return !!from && (this.state.dests[from] || []).includes(to);
+      return !!from && this._destsOf(from).includes(to);
     }
 
     _down(e) {
+      if (e.button === 2) { this._annotDown(e); return; }
       if (e.button !== 0 || this.promo) return;
       const sq = this._squareAt(e.clientX, e.clientY);
       if (!sq) return;
       e.preventDefault();
+      this.clearAnnotations();
 
       if (this.selected && this._isDest(this.selected, sq)) {
         this._attempt(this.selected, sq, true);
@@ -254,10 +281,35 @@
         return;
       }
       this.selected = null;
+      if (this.state.premove) this.onPremove(null); // clicking elsewhere cancels a premove
+      this._paintHighlights();
+    }
+
+    // Right button: a press cancels any premove; otherwise click marks a square, drag draws an arrow.
+    _annotDown(e) {
+      const sq = this._squareAt(e.clientX, e.clientY);
+      if (!sq || this.drag || this.promo) return;
+      e.preventDefault();
+      if (this.state.premove) { this.onPremove(null); return; }
+      this.annot = { from: sq, to: sq };
+    }
+
+    _annotUp(e) {
+      const a = this.annot;
+      this.annot = null;
+      const to = this._squareAt(e.clientX, e.clientY) || a.to;
+      const toggle = (set, key) => (set.has(key) ? set.delete(key) : set.add(key));
+      if (to === a.from) toggle(this.marks, to);
+      else toggle(this.arrows, `${a.from}-${to}`);
       this._paintHighlights();
     }
 
     _move(e) {
+      if (this.annot) {
+        const over = this._squareAt(e.clientX, e.clientY);
+        if (over && over !== this.annot.to) { this.annot.to = over; this._paintArrows(); }
+        return;
+      }
       const d = this.drag;
       if (!d) return;
       if (!d.started) {
@@ -279,6 +331,7 @@
     }
 
     _up(e) {
+      if (this.annot && e.button === 2) { this._annotUp(e); return; }
       const d = this.drag;
       if (!d) return;
       this.drag = null;
@@ -314,6 +367,12 @@
       const piece = this.state.pieces[from];
       const lastRank = piece[0] === 'w' ? '8' : '1';
       this.selected = null;
+      if (piece[0] !== this.state.turn) {
+        // Premove: queue it (promotions become a queen) and put the piece back until it plays.
+        this.onPremove({ from, to });
+        this._snapBack(from);
+        return;
+      }
       if (piece[1] === 'P' && to[1] === lastRank) {
         if (!animate) this._placeTemp(from, to);
         this._askPromotion(from, to, piece[0]);
