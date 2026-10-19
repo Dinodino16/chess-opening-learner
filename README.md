@@ -15,7 +15,6 @@ No build step. Open `index.html` in a browser, or serve the folder:
 npx serve .
 ```
 
-Sound effects are not in the repo. Put `move.mp3`, `capture.mp3` and `check.mp3` in `sounds/` to enable them; the game works silently without them.
 
 ## Tests
 
@@ -36,5 +35,7 @@ node test/ai.test.js         # opponent finds basic tactics, and fast enough
 | `js/app.js` | Trainer flow: colour, opening picker, opponent, review. |
 
 ## Credits
+
+Sound effects: chess.com.
 
 Pieces: cburnett set by Colin M.L. Burnett (CC BY-SA 3.0 / GPLv2+), as packaged by lichess chessground.
