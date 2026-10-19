@@ -1,0 +1,318 @@
+<title>Opening Trainer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="css/pieces.css">
+<style>
+  /* Layout: one column the width of the board: captures above, board, captures below, then the move strip. */
+  :root {
+    --bg: #3a2418;
+    --bar: #2c1b12;
+    --sq-light: #f2d7ae;
+    --sq-dark: #c98243;
+    --hl-last: rgba(234, 196, 40, 0.42);
+    --hl-select: rgba(40, 110, 60, 0.45);
+    --dot: rgba(30, 40, 25, 0.28);
+    --check: #d23a2a;
+    --ink: #fffaf3;
+    --ink-dim: #b89a80;
+    --accent: #e8a35a;
+    color-scheme: dark;
+  }
+
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 12px;
+    margin: 0;
+    box-sizing: border-box;
+    display: grid;
+    place-items: center;
+    font: 600 18px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  /* Board side = the smaller of the screen width and the height left after the strips and move bar (~140px). */
+  .game {
+    --side: min(100%, calc(100dvh - 164px), 760px);
+    width: var(--side);
+    max-width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  #board { width: 100%; }
+
+  /* Captured pieces: grouped by type, same-type pieces overlap like a stack of coins. */
+  .strip { height: 26px; display: flex; align-items: center; gap: 6px; }
+  .strip .group { display: flex; }
+  .strip .piece { position: static; width: 22px; height: 22px; flex: none; }
+  .strip .group .piece + .piece { margin-left: -13px; }
+  .strip .adv { font-size: 13px; color: var(--ink-dim); margin-left: 2px; }
+
+  .bar { min-width: 0; display: flex; align-items: stretch; gap: 6px; height: 44px; margin-top: 4px; }
+  .moves {
+    flex: 1; min-width: 0;
+    list-style: none; margin: 0; padding: 0 10px;
+    display: flex; align-items: center; gap: 4px;
+    overflow-x: auto; white-space: nowrap;
+    background: var(--bar); border-radius: 6px;
+    font: 500 15px/1 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    scrollbar-width: none;
+  }
+  .moves::-webkit-scrollbar { display: none; }
+  .moves .no { color: var(--ink-dim); margin-left: 6px; }
+  .moves .no:first-child { margin-left: 0; }
+  .moves .mv { padding: 6px 5px; border-radius: 4px; }
+  .moves .mv.latest { background: var(--accent); color: var(--bar); font-weight: 700; }
+
+  .nav {
+    flex: none; width: 44px;
+    display: grid; place-items: center;
+    background: var(--bar); color: var(--ink);
+    border: 0; border-radius: 6px; cursor: pointer;
+  }
+  .nav:hover:not(:disabled) { background: #3d2618; }
+  .nav:active:not(:disabled) { transform: translateY(1px); }
+  .nav:disabled { opacity: 0.35; cursor: default; }
+  .nav:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .cb {
+    position: relative;
+    aspect-ratio: 1;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+  }
+  .cb-squares { position: absolute; inset: 0; display: grid; grid-template: repeat(8, 1fr) / repeat(8, 1fr); }
+  .cb-sq { position: relative; }
+  .cb-sq.light { background: repeating-linear-gradient(100deg, rgba(150, 90, 30, 0.05) 0 1px, transparent 1px 5px), var(--sq-light); }
+  .cb-sq.dark  { background: repeating-linear-gradient(100deg, rgba(80, 35, 0, 0.09) 0 1px, transparent 1px 6px), var(--sq-dark); }
+  .cb-sq::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+  .cb-sq.last::after { background: var(--hl-last); }
+  .cb-sq.selected::after { background: var(--hl-select); }
+  .cb-sq.dest::after { background: radial-gradient(circle, var(--dot) 0 17%, transparent 18%); }
+  .cb-sq.capture::after { background: radial-gradient(circle, transparent 0 74%, var(--dot) 75%); }
+  .cb-sq.hover::after { background: rgba(255, 255, 255, 0.28); box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.55); }
+  .cb-sq.light.check { background: radial-gradient(circle, var(--check) 0 22%, rgba(210, 58, 42, 0.55) 45%, transparent 72%), var(--sq-light); }
+  .cb-sq.dark.check  { background: radial-gradient(circle, var(--check) 0 22%, rgba(210, 58, 42, 0.55) 45%, transparent 72%), var(--sq-dark); }
+
+  .cb-rank, .cb-file { position: absolute; font-size: clamp(9px, 1.8vmin, 14px); line-height: 1; pointer-events: none; z-index: 1; }
+  .cb-rank { top: 4%; left: 5%; }
+  .cb-file { bottom: 3%; right: 6%; }
+  .cb-sq.light .cb-rank, .cb-sq.light .cb-file { color: var(--sq-dark); }
+  .cb-sq.dark .cb-rank, .cb-sq.dark .cb-file { color: var(--sq-light); }
+
+  .cb-pieces { position: absolute; inset: 0; pointer-events: none; }
+  .piece { position: absolute; top: 0; left: 0; width: 12.5%; height: 12.5%; background-size: 100% 100%; will-change: transform; }
+  .piece.anim { transition: transform 190ms cubic-bezier(0.25, 0.9, 0.3, 1); }
+  .piece.dragging { z-index: 5; filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.35)); transition: none; width: 13.5%; height: 13.5%; margin: -0.5% 0 0 -0.5%; }
+  .piece.captured { opacity: 0; transition: opacity 200ms ease-out; }
+  .piece.appear { animation: appear 220ms ease-out; }
+  @keyframes appear { from { opacity: 0; } }
+  .cb.is-dragging { cursor: grabbing; }
+
+  .cb-overlay { position: absolute; inset: 0; z-index: 10; background: rgba(20, 12, 6, 0.5); }
+  .cb-promo {
+    position: absolute; width: 12.5%; height: 12.5%;
+    border: 0; padding: 0; border-radius: 50%;
+    background: radial-gradient(circle, #fbf3e6 55%, #d9c3a3);
+    cursor: pointer;
+  }
+  .cb-promo:hover, .cb-promo:focus-visible { border-radius: 8%; background: #fff; outline: none; }
+  .cb-promo .piece { position: static; display: block; width: 100%; height: 100%; }
+
+
+  /* Colour choice: shown before every game, on top of the board. */
+  .chooser {
+    position: absolute; inset: 0; z-index: 30;
+    display: grid; place-content: center; gap: 16px; text-align: center;
+    background: rgba(20, 12, 6, 0.72);
+    color: var(--ink);
+  }
+  .chooser p { margin: 0; font-size: clamp(18px, 4vmin, 26px); }
+  .choices { display: flex; gap: clamp(10px, 3vmin, 20px); }
+  .choice {
+    width: clamp(108px, 24vmin, 160px);
+    display: grid; justify-items: center; gap: 6px;
+    padding: 12px 10px 14px;
+    background: var(--bar); color: var(--ink);
+    border: 2px solid transparent; border-radius: 10px;
+    font: inherit; font-size: 16px; cursor: pointer;
+    transition: border-color 120ms, transform 80ms;
+  }
+  .choice:hover, .choice:focus-visible { border-color: var(--accent); outline: none; }
+  .choice:active { transform: translateY(1px); }
+  .choice .piece { position: static; width: 72%; height: auto; aspect-ratio: 1; }
+
+
+  /* Opening picker: search box over a short scrolling list. */
+  .picker {
+    position: absolute; inset: 0; z-index: 30;
+    display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 10px;
+    padding: clamp(12px, 4%, 24px);
+    background: rgba(20, 12, 6, 0.86);
+    color: var(--ink);
+  }
+  .picker-head { display: flex; align-items: center; gap: 8px; font-size: 16px; }
+  .picker-back {
+    width: 34px; height: 34px; display: grid; place-items: center;
+    background: var(--bar); color: var(--ink); border: 0; border-radius: 6px; cursor: pointer;
+  }
+  .picker-search {
+    width: 100%; box-sizing: border-box;
+    font: 500 16px/1 system-ui, -apple-system, "Segoe UI", sans-serif; /* 16px stops iOS zooming in */
+    padding: 12px 14px;
+    background: var(--sq-light); color: #2c1b12;
+    border: 2px solid transparent; border-radius: 8px;
+  }
+  .picker-search::placeholder { color: #8a6a4c; }
+  .picker-search:focus { outline: none; border-color: var(--accent); }
+  .picker-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
+  .pick {
+    width: 100%; text-align: left;
+    display: grid; gap: 3px;
+    padding: 10px 12px;
+    background: var(--bar); color: var(--ink);
+    border: 2px solid transparent; border-radius: 8px; cursor: pointer;
+    font: inherit;
+  }
+  .pick:hover, .pick:focus-visible { border-color: var(--accent); outline: none; }
+  .pick-name { font-size: 16px; }
+  .pick-meta { font-size: 12px; font-weight: 500; color: var(--ink-dim); }
+  .pick-line { font: 500 12px/1.3 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; color: var(--accent); }
+  .picker-empty { font-size: 14px; font-weight: 500; color: var(--ink-dim); padding: 8px 2px; }
+
+  .strip-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .strip-row .strip { flex: 1; min-width: 0; }
+  .end-btn {
+    flex: none; display: inline-flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 10px;
+    background: transparent; color: var(--ink-dim);
+    border: 1px solid #5a3a28; border-radius: 6px;
+    font: 600 12px/1 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer;
+  }
+  .end-btn[hidden] { display: none; }
+  .end-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .end-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Game review: result, opening score, then each of your opening moves. */
+  .review {
+    position: absolute; inset: 0; z-index: 30;
+    display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; gap: 10px;
+    padding: clamp(12px, 4%, 22px);
+    background: rgba(20, 12, 6, 0.9);
+    color: var(--ink);
+  }
+  .review p { margin: 0; }
+  .rv-result { font-size: 13px; font-weight: 600; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+  .rv-score { display: flex; align-items: center; gap: 14px; }
+  .rv-score b { font-size: clamp(34px, 9vmin, 48px); line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .rv-score b span { font-size: 0.5em; color: var(--ink-dim); }
+  .rv-verdict { font-size: 18px; }
+  .rv-detail { font-size: 13px; font-weight: 500; color: var(--ink-dim); line-height: 1.4; }
+  .rv-title { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+  .rv-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; gap: 4px; align-content: start; }
+  .rv-row { display: grid; grid-template-columns: 22px 5.5em 1fr; align-items: center; gap: 6px; padding: 6px 8px; background: var(--bar); border-radius: 6px; font-size: 13px; }
+  .rv-mark { font-weight: 800; text-align: center; }
+  .rv-row.ok .rv-mark { color: #7fd394; }
+  .rv-row.hint .rv-mark { color: var(--accent); }
+  .rv-row.miss .rv-mark { color: #ef7a6a; }
+  .rv-mv { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  .rv-note { font-weight: 500; color: var(--ink-dim); }
+  .rv-idea { font-size: 12.5px; font-weight: 500; line-height: 1.4; color: var(--ink); padding: 2px 8px 6px 36px; }
+  .rv-empty { font-size: 13px; font-weight: 500; color: var(--ink-dim); }
+  .rv-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .rv-actions .choice { width: auto; flex: 1; padding: 10px 8px; font-size: 14px; }
+
+
+  /* Short messages over the top of the board. */
+  .toast {
+    position: absolute; left: 50%; bottom: calc(100% + 1px); z-index: 25; /* over the top captures strip, clear of the pieces */
+    transform: translate(-50%, -6px);
+    max-width: 88%;
+    padding: 5px 12px; border-radius: 999px;
+    background: rgba(28, 17, 11, 0.92); color: var(--ink);
+    font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    opacity: 0; pointer-events: none;
+    transition: opacity 160ms, transform 160ms;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+
+
+  /* Idea panel: why the last move was played. Its height is reserved so the board doesn't jump. */
+  .game.ideas-on { --side: min(100%, calc(100dvh - 164px - 122px), 760px); }
+  .idea {
+    height: 112px; box-sizing: border-box; overflow-y: auto;
+    padding: 10px 12px;
+    background: var(--bar); border-radius: 6px;
+    display: grid; align-content: start; gap: 4px;
+  }
+  .game:not(.ideas-on) .idea { display: none; }
+  .idea p { margin: 0; }
+  .idea-move { font: 700 13px/1.2 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; color: var(--accent); }
+  .idea-move span { font: 500 12px/1 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-dim); margin-left: 6px; }
+  .idea-text { font-size: 14px; font-weight: 500; line-height: 1.45; }
+  .idea-src { font-size: 12px; font-weight: 500; color: var(--ink-dim); }
+  .idea-src a { color: var(--ink-dim); text-underline-offset: 2px; }
+  .idea-src a:hover { color: var(--ink); }
+  .ideas-btn[aria-pressed="true"] { color: var(--accent); }
+  .hint-btn[data-level="1"] { color: #7fd394; }
+  .cb-arrows { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
+  .cb-arrow { opacity: 0.82; }
+  .cb-arrow polyline { fill: none; stroke: rgb(60, 150, 80); stroke-width: 0.17; stroke-linejoin: round; }
+  .cb-arrow polygon { fill: rgb(60, 150, 80); }
+  .cb-sq.hint::after { box-shadow: inset 0 0 0 4px rgba(70, 160, 90, 0.95); }
+  .cb-sq.wrong::before {
+    content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: rgba(210, 58, 42, 0.6);
+    animation: wrong 450ms ease-out forwards;
+  }
+  @keyframes wrong { to { opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .piece.anim, .piece.captured { transition: none; }
+    .piece.appear { animation: none; }
+    .toast { transition: none; }
+  }
+</style>
+
+<main class="game">
+  <div class="strip" id="strip-top" aria-label="Pieces captured by Black"></div>
+  <div id="board"></div>
+  <div class="strip-row">
+    <div class="strip" id="strip-bottom" aria-label="Pieces captured by White"></div>
+    <button class="end-btn" id="end" type="button" hidden>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>
+      End game
+    </button>
+  </div>
+  <div class="bar">
+    <ol class="moves" id="moves" aria-label="Moves"></ol>
+    <button class="nav ideas-btn" id="ideas-btn" type="button" aria-pressed="true" aria-label="Explain each move" title="Explain each move (I)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.5C4.5 4 8 4 12 6c4-2 7.5-2 10-.5V19c-2.5-1.5-6-1.5-10 .5-4-2-7.5-2-10-.5z"/><path d="M12 6v13.5"/></svg>
+    </button>
+    <button class="nav hint-btn" id="hint" type="button" data-level="0" aria-label="Hint: show the piece to move" title="Hint (H)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1.1 1.3 1.1 2.2h5c0-.9.5-1.7 1.1-2.2A6 6 0 0 0 12 3z"/></svg>
+    </button>
+    <button class="nav" id="undo" type="button" aria-label="Take back move" title="Take back move (←)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <button class="nav" id="forward" type="button" aria-label="Replay move" title="Replay move (→)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+  <section class="idea" id="idea" aria-live="polite" aria-label="Idea behind the move">
+    <p class="idea-move" id="idea-move"></p>
+    <p class="idea-text" id="idea-text"></p>
+    <p class="idea-src" id="idea-src"></p>
+  </section>
+</main>
+
+<script src="js/chess.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/board.js"></script>
+<script src="js/openings.js"></script>
+<script src="js/app.js"></script>

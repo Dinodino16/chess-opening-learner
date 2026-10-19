@@ -1,0 +1,5 @@
+# chess.com sound effects: not ours to redistribute in a public repo.
+# Put move.mp3, capture.mp3 and check.mp3 in sounds/ locally.
+sounds/*.mp3
+sounds/original/
+.DS_Store
